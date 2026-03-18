@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AuthModalProps {
@@ -8,12 +8,13 @@ interface AuthModalProps {
   initialMode?: 'login' | 'signup';
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  initialMode = 'login' 
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  initialMode = 'login'
 }) => {
   const { login, signup, isLoading } = useAuth();
+  const [slowConnection, setSlowConnection] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -28,6 +29,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSlowConnection(false);
+
+    const slowTimer = setTimeout(() => setSlowConnection(true), 5000);
 
     try {
       if (mode === 'login') {
@@ -35,9 +39,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         await signup(formData.name, formData.email, formData.password);
       }
+      clearTimeout(slowTimer);
       onClose();
     } catch (err) {
-      setError(mode === 'login' ? 'Invalid credentials' : 'Failed to create account');
+      clearTimeout(slowTimer);
+      setSlowConnection(false);
+      setError(mode === 'login' ? 'Invalid email or password' : 'Failed to create account. Try again.');
     }
   };
 
@@ -51,22 +58,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
+        <div className="flex items-center justify-center p-6 border-b dark:border-gray-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             {mode === 'login' ? 'Welcome back' : 'Create account'}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          >
-            <X size={20} />
-          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+          {slowConnection && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 p-3 rounded-lg text-sm">
+              Server is waking up, please wait a moment...
             </div>
           )}
 
