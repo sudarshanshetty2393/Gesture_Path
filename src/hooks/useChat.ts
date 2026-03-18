@@ -64,7 +64,7 @@ export const useChat = () => {
     try {
       console.log("Sending translation request for:", content);
       const startTime = Date.now();
-      const response = await fetch('http://localhost:5005/api/translate', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/translate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +111,7 @@ export const useChat = () => {
       // Save to history
       const user = JSON.parse(localStorage.getItem('user_data') || '{}');
       if (user && user.id) {
-        await fetch('http://localhost:5005/api/history', {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

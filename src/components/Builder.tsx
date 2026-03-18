@@ -47,7 +47,7 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
             // Construct SiGML (simplified for demo)
             const sigml = `<sigml><hns_sign gloss="${word}"><hamnosys_manual>${sequence.join('')}</hamnosys_manual></hns_sign></sigml>`;
 
-            await fetch('http://localhost:5005/api/gestures', {
+            await fetch(`${import.meta.env.VITE_API_URL}/api/gestures`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ word, sigml }),

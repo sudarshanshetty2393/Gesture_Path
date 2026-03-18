@@ -16,5 +16,23 @@
     "username": "Test User",
     "email": "test@test.com",
     "password": "password"
+  },
+  {
+    "id": "1773836905777",
+    "username": "Test",
+    "email": "darshanshetty7259@gmail.com",
+    "password": "9090"
+  },
+  {
+    "id": "1773836954875",
+    "username": "suda",
+    "email": "sudarshanshetty7259@gmail.com",
+    "password": "0000"
+  },
+  {
+    "id": "1773837234281",
+    "username": "endTime",
+    "email": "shanshetty7259@gmail.com",
+    "password": "9090"
   }
 ]

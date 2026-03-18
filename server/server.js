@@ -4,9 +4,13 @@ import bodyParser from 'body-parser';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = 5005;
@@ -15,43 +19,49 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Paths
-const USERS_FILE = path.join(__dirname, 'users.json');
-const HISTORY_FILE = path.join(__dirname, 'history.json');
 const DATA_DIR = path.join(__dirname, 'data');
 
 // ============================================
-// AUTHENTICATION & HISTORY (From isl-translator)
+// MONGODB CONNECTION
 // ============================================
 
-// Helper to read/write JSON
-const readJson = async (file) => {
-    try {
-        const data = await fs.readFile(file, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        return [];
-    }
-};
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('Connected to MongoDB'))
+    .catch(err => console.error('MongoDB connection error:', err));
 
-const writeJson = async (file, data) => {
-    await fs.writeFile(file, JSON.stringify(data, null, 2));
-};
+// Schemas
+const userSchema = new mongoose.Schema({
+    username: String,
+    email: { type: String, unique: true },
+    password: String,
+}, { timestamps: true });
+
+const historySchema = new mongoose.Schema({
+    userId: String,
+    type: String,
+    content: mongoose.Schema.Types.Mixed,
+    timestamp: { type: Date, default: Date.now },
+});
+
+const User = mongoose.model('User', userSchema);
+const History = mongoose.model('History', historySchema);
+
+// ============================================
+// AUTHENTICATION & HISTORY
+// ============================================
 
 // Signup
 app.post('/api/signup', async (req, res) => {
     try {
         const { username, email, password } = req.body;
-        const users = await readJson(USERS_FILE);
 
-        if (users.find(u => u.email === email)) {
+        if (await User.findOne({ email })) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        const newUser = { id: Date.now().toString(), username, email, password };
-        users.push(newUser);
-        await writeJson(USERS_FILE, users);
+        const newUser = await User.create({ username, email, password });
 
-        res.status(201).json({ user: { id: newUser.id, username: newUser.username, email: newUser.email } });
+        res.status(201).json({ user: { id: newUser._id, username: newUser.username, email: newUser.email } });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -61,14 +71,13 @@ app.post('/api/signup', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const users = await readJson(USERS_FILE);
-        const user = users.find(u => u.email === email && u.password === password);
+        const user = await User.findOne({ email, password });
 
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        res.json({ user: { id: user.id, username: user.username, email: user.email } });
+        res.json({ user: { id: user._id, username: user.username, email: user.email } });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
@@ -77,8 +86,7 @@ app.post('/api/login', async (req, res) => {
 // Get History
 app.get('/api/history/:userId', async (req, res) => {
     try {
-        const history = await readJson(HISTORY_FILE);
-        const userHistory = history.filter(h => h.userId === req.params.userId);
+        const userHistory = await History.find({ userId: req.params.userId }).sort({ timestamp: -1 });
         res.json(userHistory);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -89,19 +97,7 @@ app.get('/api/history/:userId', async (req, res) => {
 app.post('/api/history', async (req, res) => {
     try {
         const { userId, type, content } = req.body;
-        const history = await readJson(HISTORY_FILE);
-
-        const newEntry = {
-            id: Date.now().toString(),
-            userId,
-            type,
-            content,
-            timestamp: new Date().toISOString()
-        };
-
-        history.push(newEntry);
-        await writeJson(HISTORY_FILE, history);
-
+        const newEntry = await History.create({ userId, type, content });
         res.status(201).json(newEntry);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthState } from '../types';
+import { AuthState } from '../types';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -50,23 +50,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      const response = await fetch('http://localhost:5005/api/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
         throw new Error('Login failed');
       }
 
-      const user = await response.json();
+      const { user } = await response.json();
 
       localStorage.setItem('user_data', JSON.stringify(user));
 
@@ -85,7 +85,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      const response = await fetch('http://localhost:5005/api/signup', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Signup failed');
       }
 
-      const user = await response.json();
+      const { user } = await response.json();
 
       localStorage.setItem('user_data', JSON.stringify(user));
 
