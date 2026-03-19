@@ -1,30 +1,14 @@
 {
+    "jasBase": "https://vhg.cmp.uea.ac.uk/tech/jas/vhg2024/",
+    "avs": ["anna", "marc", "luna"],
     "avSettings": [
         {
             "initAv": "anna",
-            "initCamera": [
-                0,
-                1.35,
-                0.38,
-                0,
-                0,
-                15,
-                -1,
-                -1
-            ]
+            "avList": "avs",
+            "width": 384,
+            "height": 320,
+            "background": null,
+            "initCamera": [0, 0.9, 3.0, 0, 5, 25, -1, -1]
         }
-    ],
-    "allavs": [
-        "anna",
-        "marc",
-        "luna"
-    ],
-    "gui": {
-        "display": "flex",
-        "justify-content": "center",
-        "align-items": "center",
-        "width": 700,
-        "height": 700,
-        "background": "transparent"
-    }
+    ]
 }

@@ -15,11 +15,14 @@ function AppContent() {
   const {
     chats,
     activeChat,
+    instantMessages,
     isLoading: chatLoading,
     createNewChat,
     sendMessage,
     selectChat,
     deleteChat,
+    setActiveChat,
+    clearInstantMessages,
   } = useChat();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -46,6 +49,7 @@ function AppContent() {
   const handleNewChat = () => {
     if (instantModeActive) {
       setInstantModeActive(false);
+      clearInstantMessages();
     }
     setShowModeSelection(true);
   };
@@ -54,6 +58,9 @@ function AppContent() {
     setConversionSettings(settings);
     if (!settings.instantMode) {
       createNewChat(settings);
+    } else {
+      setActiveChat(null);
+      clearInstantMessages();
     }
     setInstantModeActive(settings.instantMode);
   };
@@ -66,18 +73,24 @@ function AppContent() {
 
   const handleInstantMode = () => {
     setInstantModeActive(true);
+    setActiveChat(null);
+    clearInstantMessages();
     setConversionSettings({
       inputMode: 'text',
-      outputMode: 'text',
+      outputMode: 'visual',
       instantMode: true,
     });
   };
+
+  const currentMessages = instantModeActive
+    ? instantMessages
+    : (activeChat?.messages || []);
 
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl animate-pulse mx-auto mb-4"></div>
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl animate-pulse mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
@@ -102,45 +115,32 @@ function AppContent() {
                 onClose={() => setIsSidebarOpen(false)}
                 chats={chats}
                 activeChat={activeChat}
-                onSelectChat={selectChat}
+                onSelectChat={(chat) => {
+                  setInstantModeActive(false);
+                  selectChat(chat);
+                }}
                 onDeleteChat={deleteChat}
                 onInstantMode={handleInstantMode}
                 instantModeActive={instantModeActive}
               />
 
-              <main className="flex-1 flex flex-col bg-white dark:bg-gray-800">
-                {activeChat || instantModeActive ? (
-                  <ChatArea
-                    messages={activeChat?.messages || []}
-                    onSendMessage={handleSendMessage}
-                    conversionSettings={conversionSettings}
-                    isLoading={chatLoading}
-                    instantMode={instantModeActive}
-                  />
-                ) : (
-                  <div className="flex-1 flex items-center justify-center p-8">
-                    <div className="text-center max-w-2xl">
-                      <img src="/images/Logo.svg" alt="Gesture Path" className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" />
-                      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                        Welcome to Gesture Path
-                      </h1>
-                      <div className="flex flex-wrap gap-4 justify-center">
-                        <button
-                          onClick={handleNewChat}
-                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                          Start New Conversion
-                        </button>
-                        <button
-                          onClick={handleInstantMode}
-                          className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                          Try Instant Mode
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <main className="flex-1 flex flex-col bg-white dark:bg-gray-800 overflow-hidden">
+                {/*
+                  * ChatArea is always mounted once authenticated.
+                  * This keeps the Avatar (and CWASAPanel av0 div) permanently in the DOM
+                  * so CWASA never loses its reference to the canvas on re-init.
+                  * Welcome state is rendered inside ChatArea when messages are empty.
+                  */}
+                <ChatArea
+                  messages={currentMessages}
+                  onSendMessage={handleSendMessage}
+                  conversionSettings={conversionSettings}
+                  isLoading={chatLoading}
+                  instantMode={instantModeActive}
+                  showWelcome={!activeChat && !instantModeActive}
+                  onNewChat={handleNewChat}
+                  onInstantMode={handleInstantMode}
+                />
               </main>
             </div>
 
