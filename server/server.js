@@ -63,7 +63,8 @@ app.post('/api/signup', async (req, res) => {
 
         res.status(201).json({ user: { id: newUser._id, username: newUser.username, email: newUser.email } });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Signup error:', error);
+        res.status(500).json({ message: 'Server error', detail: error.message });
     }
 });
 
@@ -79,7 +80,8 @@ app.post('/api/login', async (req, res) => {
 
         res.json({ user: { id: user._id, username: user.username, email: user.email } });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error', detail: error.message });
     }
 });
 

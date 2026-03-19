@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/Auth/AuthModal';
 import { Header } from './components/Layout/Header';
-import { Sidebar } from './components/Layout/Sidebar';
 import { ChatArea } from './components/Chat/ChatArea';
 import { ModeSelectionModal } from './components/Chat/ModeSelectionModal';
 import { useChat } from './hooks/useChat';
@@ -11,23 +10,20 @@ import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Builder from './components/Builder';
 
 function AppContent() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const {
-    chats,
     activeChat,
     instantMessages,
     isLoading: chatLoading,
     createNewChat,
     sendMessage,
-    selectChat,
-    deleteChat,
     setActiveChat,
     clearInstantMessages,
+    resetAll,
   } = useChat();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showModeSelection, setShowModeSelection] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [conversionSettings, setConversionSettings] = useState<ConversionSettings>({
     inputMode: 'text',
     outputMode: 'visual',
@@ -41,10 +37,15 @@ function AppContent() {
   const builderWord = queryParams.get('word') || '';
 
   React.useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (!isAuthenticated) {
+      // Logout — clear all chat state so next login starts fresh
+      resetAll();
+      setInstantModeActive(false);
       setShowAuthModal(true);
+    } else {
+      setShowAuthModal(false);
     }
-  }, [authLoading, isAuthenticated]);
+  }, [isAuthenticated]);
 
   const handleNewChat = () => {
     if (instantModeActive) {
@@ -86,51 +87,24 @@ function AppContent() {
     ? instantMessages
     : (activeChat?.messages || []);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl animate-pulse mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
+  // Derive latest sigml from messages — used by the always-mounted Avatar below
+  const activeSigml = useMemo(() => {
+    const last = [...currentMessages].reverse().find(
+      (m) => m.role === 'assistant' && m.metadata?.sigml
     );
-  }
+    return last?.metadata?.sigml ?? null;
+  }, [currentMessages]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gray-950 flex flex-col">
       <Routes>
         <Route path="/builder" element={<Builder initialWord={builderWord} onClose={() => navigate('/')} />} />
         <Route path="/" element={
           <>
-            <Header
-              onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-              onNewChat={handleNewChat}
-              isSidebarOpen={isSidebarOpen}
-            />
+            <Header onNewChat={handleNewChat} />
 
             <div className="flex flex-1 overflow-hidden">
-              <Sidebar
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                chats={chats}
-                activeChat={activeChat}
-                onSelectChat={(chat) => {
-                  setInstantModeActive(false);
-                  selectChat(chat);
-                }}
-                onDeleteChat={deleteChat}
-                onInstantMode={handleInstantMode}
-                instantModeActive={instantModeActive}
-              />
-
-              <main className="flex-1 flex flex-col bg-white dark:bg-gray-800 overflow-hidden">
-                {/*
-                  * ChatArea is always mounted once authenticated.
-                  * This keeps the Avatar (and CWASAPanel av0 div) permanently in the DOM
-                  * so CWASA never loses its reference to the canvas on re-init.
-                  * Welcome state is rendered inside ChatArea when messages are empty.
-                  */}
+              <main className="flex-1 flex flex-col bg-gray-900 overflow-hidden">
                 <ChatArea
                   messages={currentMessages}
                   onSendMessage={handleSendMessage}
@@ -140,6 +114,7 @@ function AppContent() {
                   showWelcome={!activeChat && !instantModeActive}
                   onNewChat={handleNewChat}
                   onInstantMode={handleInstantMode}
+                  activeSigml={activeSigml}
                 />
               </main>
             </div>
@@ -157,6 +132,7 @@ function AppContent() {
           </>
         } />
       </Routes>
+
     </div>
   );
 }

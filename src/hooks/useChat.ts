@@ -168,6 +168,12 @@ export const useChat = () => {
     setInstantMessages([]);
   }, []);
 
+  const resetAll = useCallback(() => {
+    setChats([]);
+    setActiveChat(null);
+    setInstantMessages([]);
+  }, []);
+
   return {
     chats,
     activeChat,
@@ -179,5 +185,6 @@ export const useChat = () => {
     deleteChat,
     setActiveChat,
     clearInstantMessages,
+    resetAll,
   };
 };
