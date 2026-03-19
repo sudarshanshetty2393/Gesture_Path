@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthModal } from './components/Auth/AuthModal';
 import { Header } from './components/Layout/Header';
-import { Sidebar } from './components/Layout/Sidebar';
 import { ChatArea } from './components/Chat/ChatArea';
 import { ModeSelectionModal } from './components/Chat/ModeSelectionModal';
 import { useChat } from './hooks/useChat';
@@ -11,20 +10,20 @@ import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Builder from './components/Builder';
 
 function AppContent() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const {
-    chats,
     activeChat,
+    instantMessages,
     isLoading: chatLoading,
     createNewChat,
     sendMessage,
-    selectChat,
-    deleteChat,
+    setActiveChat,
+    clearInstantMessages,
+    resetAll,
   } = useChat();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showModeSelection, setShowModeSelection] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [conversionSettings, setConversionSettings] = useState<ConversionSettings>({
     inputMode: 'text',
     outputMode: 'visual',
@@ -38,14 +37,20 @@ function AppContent() {
   const builderWord = queryParams.get('word') || '';
 
   React.useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (!isAuthenticated) {
+      // Logout — clear all chat state so next login starts fresh
+      resetAll();
+      setInstantModeActive(false);
       setShowAuthModal(true);
+    } else {
+      setShowAuthModal(false);
     }
-  }, [authLoading, isAuthenticated]);
+  }, [isAuthenticated]);
 
   const handleNewChat = () => {
     if (instantModeActive) {
       setInstantModeActive(false);
+      clearInstantMessages();
     }
     setShowModeSelection(true);
   };
@@ -54,6 +59,9 @@ function AppContent() {
     setConversionSettings(settings);
     if (!settings.instantMode) {
       createNewChat(settings);
+    } else {
+      setActiveChat(null);
+      clearInstantMessages();
     }
     setInstantModeActive(settings.instantMode);
   };
@@ -66,81 +74,48 @@ function AppContent() {
 
   const handleInstantMode = () => {
     setInstantModeActive(true);
+    setActiveChat(null);
+    clearInstantMessages();
     setConversionSettings({
       inputMode: 'text',
-      outputMode: 'text',
+      outputMode: 'visual',
       instantMode: true,
     });
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl animate-pulse mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
+  const currentMessages = instantModeActive
+    ? instantMessages
+    : (activeChat?.messages || []);
+
+  // Derive latest sigml from messages — used by the always-mounted Avatar below
+  const activeSigml = useMemo(() => {
+    const last = [...currentMessages].reverse().find(
+      (m) => m.role === 'assistant' && m.metadata?.sigml
     );
-  }
+    return last?.metadata?.sigml ?? null;
+  }, [currentMessages]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+    <div className="min-h-screen bg-gray-950 flex flex-col">
       <Routes>
         <Route path="/builder" element={<Builder initialWord={builderWord} onClose={() => navigate('/')} />} />
         <Route path="/" element={
           <>
-            <Header
-              onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-              onNewChat={handleNewChat}
-              isSidebarOpen={isSidebarOpen}
-            />
+            <Header onNewChat={handleNewChat} />
 
             <div className="flex flex-1 overflow-hidden">
-              <Sidebar
-                isOpen={isSidebarOpen}
-                onClose={() => setIsSidebarOpen(false)}
-                chats={chats}
-                activeChat={activeChat}
-                onSelectChat={selectChat}
-                onDeleteChat={deleteChat}
-                onInstantMode={handleInstantMode}
-                instantModeActive={instantModeActive}
-              />
-
-              <main className="flex-1 flex flex-col bg-white dark:bg-gray-800">
-                {activeChat || instantModeActive ? (
-                  <ChatArea
-                    messages={activeChat?.messages || []}
-                    onSendMessage={handleSendMessage}
-                    conversionSettings={conversionSettings}
-                    isLoading={chatLoading}
-                    instantMode={instantModeActive}
-                  />
-                ) : (
-                  <div className="flex-1 flex items-center justify-center p-8">
-                    <div className="text-center max-w-2xl">
-                      <img src="/images/Logo.svg" alt="Gesture Path" className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" />
-                      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                        Welcome to Gesture Path
-                      </h1>
-                      <div className="flex flex-wrap gap-4 justify-center">
-                        <button
-                          onClick={handleNewChat}
-                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                          Start New Conversion
-                        </button>
-                        <button
-                          onClick={handleInstantMode}
-                          className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-                        >
-                          Try Instant Mode
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <main className="flex-1 flex flex-col bg-gray-900 overflow-hidden">
+                <ChatArea
+                  messages={currentMessages}
+                  onSendMessage={handleSendMessage}
+                  conversionSettings={conversionSettings}
+                  isLoading={chatLoading}
+                  instantMode={instantModeActive}
+                  showWelcome={!activeChat && !instantModeActive}
+                  onNewChat={handleNewChat}
+                  onInstantMode={handleInstantMode}
+                  activeSigml={activeSigml}
+                />
               </main>
             </div>
 
@@ -157,6 +132,7 @@ function AppContent() {
           </>
         } />
       </Routes>
+
     </div>
   );
 }

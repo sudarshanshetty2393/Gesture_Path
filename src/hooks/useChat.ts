@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Chat, Message, ConversionSettings } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -6,7 +6,10 @@ export const useChat = () => {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
+  const [instantMessages, setInstantMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const activeChatRef = useRef<Chat | null>(null);
+  activeChatRef.current = activeChat;
 
   const createNewChat = useCallback((conversionSettings: ConversionSettings) => {
     const newChat: Chat = {
@@ -17,13 +20,8 @@ export const useChat = () => {
       userId: user?.id || 'anonymous',
       messages: [],
     };
-
     setChats(prev => [newChat, ...prev]);
     setActiveChat(newChat);
-
-    // TODO: Save to backend
-    // await saveChat(newChat);
-
     return newChat;
   }, [user]);
 
@@ -32,7 +30,7 @@ export const useChat = () => {
     type: 'text' | 'audio' | 'visual',
     conversionSettings: ConversionSettings
   ) => {
-    if (!activeChat) return;
+    const isInstant = !activeChatRef.current;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -46,112 +44,147 @@ export const useChat = () => {
       },
     };
 
-    // Add user message
-    setActiveChat(prev => prev ? {
-      ...prev,
-      messages: [...prev.messages, userMessage],
-      updatedAt: new Date().toISOString(),
-    } : null);
-
-    setChats(prev => prev.map(chat =>
-      chat.id === activeChat.id
-        ? { ...chat, messages: [...chat.messages, userMessage], updatedAt: new Date().toISOString() }
-        : chat
-    ));
+    if (isInstant) {
+      setInstantMessages(prev => [...prev, userMessage]);
+    } else {
+      setActiveChat(prev => prev ? {
+        ...prev,
+        messages: [...prev.messages, userMessage],
+        updatedAt: new Date().toISOString(),
+      } : null);
+      setChats(prev => prev.map(chat =>
+        chat.id === activeChatRef.current!.id
+          ? { ...chat, messages: [...chat.messages, userMessage], updatedAt: new Date().toISOString() }
+          : chat
+      ));
+    }
 
     setIsLoading(true);
 
     try {
-      console.log("Sending translation request for:", content);
-      const startTime = Date.now();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/translate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: content }),
       });
 
-      const data = await response.json();
-      console.log("Received translation response in", Date.now() - startTime, "ms", data);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
+      const data = await response.json();
+
+      // Merge all hns_sign blocks into a single <sigml> root
       let sigml = '';
       if (data.sequence && data.sequence.length > 0) {
-        sigml = data.sequence.map((s: any) => s.sigml).join('\n');
+        const signs = data.sequence
+          .filter((s: any) => s.sigml && s.type !== 'missing')
+          .map((s: any) => {
+            const match = s.sigml.match(/<sigml>([\s\S]*?)<\/sigml>/);
+            return match ? match[1].trim() : '';
+          })
+          .filter(Boolean)
+          .join('\n');
+        if (signs) sigml = `<sigml>\n${signs}\n</sigml>`;
       }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'Here is the translation:',
+        content: sigml ? 'Here is the sign language translation:' : 'No signs found for this input.',
         role: 'assistant',
         timestamp: new Date().toISOString(),
-        type: 'visual', // Always visual for now as we are doing ISL
+        type: 'visual',
         metadata: {
           originalMode: conversionSettings.inputMode,
           targetMode: conversionSettings.outputMode,
-          processingTime: 0, // Backend doesn't return this yet
-          sigml: sigml,
-          missingWords: data.missing_words
+          sigml: sigml || undefined,
+          missingWords: data.missing_words,
         },
       };
 
-      // Add assistant message
-      setActiveChat(prev => prev ? {
-        ...prev,
-        messages: [...prev.messages, assistantMessage],
-        updatedAt: new Date().toISOString(),
-      } : null);
-
-      setChats(prev => prev.map(chat =>
-        chat.id === activeChat.id
-          ? { ...chat, messages: [...chat.messages, assistantMessage], updatedAt: new Date().toISOString() }
-          : chat
-      ));
+      if (isInstant) {
+        // In instant mode, replace previous assistant message so only latest shows
+        setInstantMessages(prev => {
+          const withoutPrevAssistant = prev.filter(m => m.role !== 'assistant');
+          return [...withoutPrevAssistant, assistantMessage];
+        });
+      } else {
+        setActiveChat(prev => prev ? {
+          ...prev,
+          messages: [...prev.messages, assistantMessage],
+          updatedAt: new Date().toISOString(),
+        } : null);
+        setChats(prev => prev.map(chat =>
+          chat.id === activeChatRef.current?.id
+            ? { ...chat, messages: [...chat.messages, assistantMessage], updatedAt: new Date().toISOString() }
+            : chat
+        ));
+      }
 
       // Save to history
-      const user = JSON.parse(localStorage.getItem('user_data') || '{}');
-      if (user && user.id) {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
+      const storedUser = JSON.parse(localStorage.getItem('user_data') || '{}');
+      if (storedUser?.id) {
+        fetch(`${import.meta.env.VITE_API_URL}/api/history`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id,
-            type: 'conversion',
-            content: content,
-          }),
-        });
+          body: JSON.stringify({ userId: storedUser.id, type: 'conversion', content }),
+        }).catch(() => {});
       }
 
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Handle error - maybe show a toast notification
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        content: 'Failed to get translation. Please check your connection and try again.',
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+        type: 'text',
+      };
+      if (isInstant) {
+        setInstantMessages(prev => [...prev, errorMsg]);
+      } else {
+        setActiveChat(prev => prev ? {
+          ...prev,
+          messages: [...prev.messages, errorMsg],
+          updatedAt: new Date().toISOString(),
+        } : null);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [activeChat]);
+  }, []);
 
   const selectChat = useCallback((chat: Chat) => {
     setActiveChat(chat);
+    setInstantMessages([]);
   }, []);
 
   const deleteChat = useCallback((chatId: string) => {
     setChats(prev => prev.filter(chat => chat.id !== chatId));
-    if (activeChat?.id === chatId) {
+    if (activeChatRef.current?.id === chatId) {
       setActiveChat(null);
     }
+  }, []);
 
-    // TODO: Delete from backend
-    // await deleteChat(chatId);
-  }, [activeChat]);
+  const clearInstantMessages = useCallback(() => {
+    setInstantMessages([]);
+  }, []);
+
+  const resetAll = useCallback(() => {
+    setChats([]);
+    setActiveChat(null);
+    setInstantMessages([]);
+  }, []);
 
   return {
     chats,
     activeChat,
+    instantMessages,
     isLoading,
     createNewChat,
     sendMessage,
     selectChat,
     deleteChat,
     setActiveChat,
+    clearInstantMessages,
+    resetAll,
   };
 };
