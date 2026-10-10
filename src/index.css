@@ -1,3 +1,134 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Design tokens (RGB channels so Tailwind can apply opacity) ─────────── */
+@layer base {
+  :root {
+    --canvas: 246 247 249;
+    --surface: 255 255 255;
+    --surface-2: 241 244 248;
+    --surface-3: 228 233 240;
+    --line: 226 231 238;
+    --line-strong: 203 212 224;
+    --ink: 15 23 42;
+    --ink-2: 71 85 105;
+    --ink-3: 120 133 153;
+    --brand: 37 99 235;
+    --brand-hover: 29 78 216;
+    --brand-soft: 230 239 254;
+    --brand-ink: 29 78 216;
+    --sign: 13 148 136;
+    --sign-soft: 224 247 243;
+    --sign-ink: 15 118 110;
+    --danger: 220 38 38;
+    --danger-soft: 254 236 236;
+    --warn: 217 119 6;
+    --warn-soft: 255 247 230;
+    --warn-ink: 146 64 14;
+    color-scheme: light;
+  }
+
+  .dark {
+    --canvas: 10 12 18;
+    --surface: 18 21 29;
+    --surface-2: 25 29 39;
+    --surface-3: 35 40 52;
+    --line: 36 42 55;
+    --line-strong: 54 62 79;
+    --ink: 238 242 247;
+    --ink-2: 163 173 190;
+    --ink-3: 112 123 143;
+    --brand: 59 125 240;
+    --brand-hover: 82 145 246;
+    --brand-soft: 25 38 68;
+    --brand-ink: 147 190 253;
+    --sign: 45 212 191;
+    --sign-soft: 15 46 46;
+    --sign-ink: 110 231 211;
+    --danger: 248 113 113;
+    --danger-soft: 58 22 26;
+    --warn: 251 191 36;
+    --warn-soft: 52 38 12;
+    --warn-ink: 252 211 77;
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+
+  ::selection {
+    background: rgb(var(--brand) / 0.2);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 2px;
+  }
+
+  /* Quiet scrollbars that match the theme */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(var(--line-strong));
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
+
+/* ── Building blocks ───────────────────────────────────────────────────── */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold
+      transition-colors duration-150 select-none whitespace-nowrap
+      disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-sm { @apply h-8 px-3 text-xs rounded-lg gap-1.5; }
+  .btn-lg { @apply h-12 px-5 text-[15px]; }
+  .btn-primary { @apply bg-brand text-white hover:bg-brand-hover shadow-sm; }
+  .btn-secondary { @apply bg-surface text-ink border border-line hover:bg-surface-2 hover:border-line-strong; }
+  .btn-ghost { @apply text-ink-2 hover:bg-surface-2 hover:text-ink; }
+  .btn-sign { @apply bg-sign-soft text-sign-ink hover:bg-sign/20; }
+
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-9 h-9 rounded-lg text-ink-2 transition-colors
+      hover:bg-surface-2 hover:text-ink disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  .card { @apply bg-surface border border-line rounded-2xl; }
+
+  .input {
+    @apply w-full h-11 px-3.5 rounded-xl bg-surface border border-line text-sm text-ink
+      placeholder:text-ink-3 outline-none transition-[border-color,box-shadow]
+      focus:border-brand focus:shadow-ring;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium
+      bg-surface-2 text-ink-2 border border-line;
+  }
+
+  .eyebrow { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3; }
+
+  .kbd {
+    @apply inline-flex items-center px-1.5 h-5 rounded border border-line bg-surface-2 text-[10px] font-semibold text-ink-3;
+  }
+}

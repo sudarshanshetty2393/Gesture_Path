@@ -12,6 +12,8 @@ export interface Chat {
   updatedAt: string;
   userId: string;
   messages: Message[];
+  /** The mode this chat was started in (older saved chats may not have it). */
+  settings?: ConversionSettings;
 }
 
 export interface Message {
@@ -26,6 +28,8 @@ export interface Message {
     processingTime?: number;
     sigml?: string;
     missingWords?: string[];
+    /** Words/phrases the avatar signs for this message, in order. */
+    signedWords?: string[];
   };
 }
 

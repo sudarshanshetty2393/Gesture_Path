@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<!--
+  Hidden frame that hosts the sign-recognition engine (MediaPipe + TensorFlow.js).
+  It must stay separate from index.html: the JASigning avatar script (allcsa.js)
+  replaces the global WebAssembly with a wasm2js polyfill, which breaks both
+  libraries. See src/sign/engine.ts.
+-->
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign engine</title>
+</head>
+<body>
+  <script type="module" src="/src/sign/engineFrame.ts"></script>
+</body>
+</html>
