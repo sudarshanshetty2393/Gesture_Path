@@ -1,76 +1,103 @@
 import React, { useRef, useEffect } from 'react';
-import { Plus, LogOut, Settings } from 'lucide-react';
+import { Plus, LogOut, PanelLeft, Hammer, Moon, Sun } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../hooks/useTheme';
 
 interface HeaderProps {
   onNewChat: () => void;
+  onToggleSidebar: () => void;
+  /** Logo click: back to the dashboard (welcome screen). */
+  onHome: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onNewChat }) => {
+export const Header: React.FC<HeaderProps> = ({ onNewChat, onToggleSidebar, onHome }) => {
   const { user, logout } = useAuth();
+  const { theme, toggle } = useTheme();
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowUserMenu(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowUserMenu(false);
     };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowUserMenu(false); };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKey);
+    };
   }, []);
 
-  const initials = user?.username?.slice(0, 2).toUpperCase() ?? 'U';
+  const initials = (user?.username ?? 'U').trim().split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <header className="bg-gray-900/80 backdrop-blur-xl border-b border-white/5 px-5 py-3 z-20">
-      <div className="flex items-center justify-between">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-0 bg-blue-500/30 rounded-xl blur-md" />
-            <img src="/images/Logo.svg" alt="Gesture Path" className="relative w-9 h-9 rounded-xl" />
-          </div>
-          <span className="text-lg font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            Gesture Path
-          </span>
+    <header className="h-14 flex-shrink-0 bg-surface/80 backdrop-blur-md border-b border-line px-2 sm:px-3 z-20">
+      <div className="h-full flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <button onClick={onToggleSidebar} className="icon-btn" aria-label="Toggle conversation history" title="History">
+            <PanelLeft size={18} />
+          </button>
+          <button
+            onClick={onHome}
+            className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-lg min-w-0 hover:bg-surface-2 transition-colors"
+            aria-label="Gesture Path — go to dashboard"
+            title="Dashboard"
+          >
+            <img src="/images/Logo.svg" alt="" className="w-7 h-7 rounded-lg" />
+            <span className="text-[15px] font-bold tracking-tight text-ink truncate">Gesture Path</span>
+          </button>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <button
-            onClick={onNewChat}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-sm font-medium transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+            onClick={toggle}
+            className="icon-btn"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
           >
-            <Plus size={15} />
-            <span className="hidden sm:inline">New Chat</span>
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
           </button>
 
-          <div className="relative" ref={menuRef}>
+          <button onClick={onNewChat} className="btn btn-primary h-9 px-3 sm:px-3.5" aria-label="New conversation">
+            <Plus size={16} />
+            <span className="hidden sm:inline">New chat</span>
+          </button>
+
+          <div className="relative ml-0.5" ref={menuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl hover:bg-white/5 transition-colors"
+              className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-xl hover:bg-surface-2 transition-colors"
+              aria-haspopup="menu"
+              aria-expanded={showUserMenu}
+              aria-label="Account menu"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-lg">
+              <div className="w-8 h-8 rounded-full bg-brand-soft text-brand-ink flex items-center justify-center text-xs font-bold">
                 {initials}
               </div>
-              <span className="hidden sm:inline text-sm text-gray-300">{user?.username}</span>
+              <span className="hidden md:inline text-sm font-medium text-ink-2 max-w-32 truncate">{user?.username}</span>
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-52 bg-gray-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 py-2 z-30">
-                <div className="px-4 py-2 border-b border-white/10 mb-1">
-                  <p className="text-xs text-gray-500">Signed in as</p>
-                  <p className="text-sm font-medium text-white truncate">{user?.username}</p>
+              <div role="menu" className="absolute right-0 mt-2 w-64 card shadow-lift p-1.5 z-30 animate-rise-in">
+                <div className="px-3 py-2.5 mb-1 border-b border-line">
+                  <p className="text-sm font-semibold text-ink truncate">{user?.username}</p>
+                  <p className="text-xs text-ink-3 truncate">{user?.email}</p>
                 </div>
-                <button className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-sm">
-                  <Settings size={15} className="text-gray-500" />
-                  Settings
-                </button>
+                <Link
+                  to="/builder"
+                  role="menuitem"
+                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors"
+                >
+                  <Hammer size={15} className="text-ink-3" />
+                  Sign builder
+                </Link>
                 <button
+                  role="menuitem"
                   onClick={logout}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-sm"
+                  className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger-soft transition-colors"
                 >
                   <LogOut size={15} />
                   Sign out

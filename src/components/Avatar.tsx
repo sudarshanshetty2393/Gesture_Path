@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 
 declare global {
     interface Window {
@@ -11,6 +12,8 @@ interface AvatarProps {
     sigmlData?: string | null;
     width?: number;
     height?: number;
+    /** Changing this replays sigmlData even if it is the same as before. */
+    playKey?: number;
 }
 
 // ─── Module-level singletons ────────────────────────────────────────────────
@@ -65,7 +68,7 @@ function ensureCWASA(onReady: () => void, onError: () => void): void {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-const Avatar: React.FC<AvatarProps> = ({ sigmlData, width = 288, height = 320 }) => {
+const Avatar: React.FC<AvatarProps> = ({ sigmlData, width = 288, height = 320, playKey = 0 }) => {
     const [isReady, setIsReady] = useState(_state === 'ready');
     const [loadError, setLoadError] = useState(_state === 'error');
     const [isPlaying, setIsPlaying] = useState(false);
@@ -106,34 +109,42 @@ const Avatar: React.FC<AvatarProps> = ({ sigmlData, width = 288, height = 320 })
 
     useEffect(() => {
         if (isReady && sigmlData) play(sigmlData);
-    }, [sigmlData, isReady]);
+    }, [sigmlData, isReady, playKey]);
 
     return (
-        <div className="flex flex-col items-center bg-slate-900/50 rounded-3xl p-4 border border-slate-700/50 shadow-2xl">
-            {/* Status line */}
-            {loadError ? (
-                <p className="text-red-400 text-xs text-center mb-2">
-                    ⚠️ Avatar failed to load — check network connection
-                </p>
-            ) : !isReady ? (
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                    Loading avatar…
-                </div>
-            ) : null}
-
+        <div className="flex flex-col items-center gap-3 p-3 card shadow-soft">
             {/* Container where the persistent CWASAAvatar div is appended */}
-            <div ref={containerRef} />
+            <div className="relative rounded-xl overflow-hidden bg-surface-2" style={{ minWidth: width, minHeight: height }}>
+                <div ref={containerRef} />
+                {loadError ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center bg-surface-2">
+                        <AlertTriangle size={20} className="text-warn" />
+                        <p className="text-xs text-ink-2">Avatar failed to load — check your network connection.</p>
+                    </div>
+                ) : !isReady ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface-2">
+                        <span className="w-6 h-6 rounded-full border-2 border-line-strong border-t-brand animate-spin" />
+                        <span className="text-xs text-ink-3">Loading avatar…</span>
+                    </div>
+                ) : null}
+            </div>
 
-            {/* Replay button — shown once avatar is ready */}
+            {/* Replay — shown once avatar is ready */}
             {isReady && (
-                <button
-                    onClick={() => sigmlData && play(sigmlData)}
-                    disabled={!sigmlData}
-                    className="mt-3 px-4 py-1 text-sm font-bold bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white rounded-full border border-green-500 transition-colors shadow"
-                >
-                    {isPlaying ? '⏹ Playing…' : '↺ Replay'}
-                </button>
+                <div className="w-full flex items-center justify-between gap-3 px-1">
+                    <span className={`flex items-center gap-1.5 text-xs font-medium ${isPlaying ? 'text-sign-ink' : 'text-ink-3'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isPlaying ? 'bg-sign animate-pulse' : 'bg-line-strong'}`} />
+                        {isPlaying ? 'Playing…' : sigmlData ? 'Ready' : 'Waiting for text'}
+                    </span>
+                    <button
+                        onClick={() => sigmlData && play(sigmlData)}
+                        disabled={!sigmlData}
+                        className="btn btn-secondary btn-sm"
+                    >
+                        <RotateCcw size={12} />
+                        Replay
+                    </button>
+                </div>
             )}
         </div>
     );

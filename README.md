@@ -8,6 +8,33 @@ This project integrates ISL Translation, JASigning Avatar, and HamNoSys Builder 
 - **Library**: View and manage available signs.
 - **Authentication**: User login and signup with history tracking.
 
+## Sign → Text (camera)
+Choose **Visual / ISL** as the input mode (output **Text** or **Audio**). The camera opens, and each
+sign you make is recognised and added to the message box — lower your hands after each sign. You can
+also upload a video of signs. Recognition runs entirely in the browser:
+
+- `src/sign/` — MediaPipe Holistic landmarks → features → word segmentation → TensorFlow.js classifier.
+  The engine runs in a hidden frame (`sign-engine.html`) because the avatar script `public/cwa/allcsa.js`
+  replaces the browser's `WebAssembly`, which MediaPipe and TensorFlow.js need.
+- `public/models/isl/` — the trained model (263 words, ~1.5 MB).
+- Trained on the [INCLUDE dataset](https://zenodo.org/records/4010759) by AI4Bharat (CC BY 4.0), using
+  their pre-extracted [pose data](https://zenodo.org/records/6674324). Held-out test accuracy: 95.0% top-1,
+  99.1% top-3 (816 videos).
+
+### Retraining the model (optional)
+Needs Python 3.12 and ~1 GB disk; the dataset is not committed (`training/` is gitignored).
+```bash
+python3.12 -m venv training/venv && training/venv/bin/pip install numpy tensorflow
+curl -L -o training/INCLUDE.zip 'https://zenodo.org/records/6674324/files/INCLUDE.zip?download=1'
+unzip training/INCLUDE.zip -d training/raw && cd training/raw/INCLUDE \
+  && unzip Pose_Signs.zip -d signs && unzip Train_Test_Split.zip -d split && cd -
+training/venv/bin/python ml/prepare.py training/raw/INCLUDE training/include_raw.npz
+training/venv/bin/python ml/test_parity.py training/include_raw.npz   # Python vs browser features
+training/venv/bin/python ml/train.py training/include_raw.npz training/out
+node ml/export_tfjs.mjs training/out                                   # -> public/models/isl/
+```
+`ml/features.py` and `src/sign/features.ts` must stay identical — `ml/test_parity.py` checks this.
+
 ## Prerequisites
 - Node.js (v16+)
 - NPM

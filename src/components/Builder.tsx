@@ -190,17 +190,20 @@ const STEPS: { id: StepId; title: string }[] = [
 interface BuilderProps {
   initialWord?: string;
   onClose?: () => void;
+  /** Logo click: back to the dashboard. */
+  onHome?: () => void;
 }
 
 interface SelectedSymbol extends SymbolEntry {
   stepId: StepId;
 }
 
-const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
+const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose, onHome }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selections, setSelections] = useState<Partial<Record<StepId, SelectedSymbol>>>({});
   const [word, setWord] = useState(initialWord);
   const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   useEffect(() => { if (initialWord) setWord(initialWord); }, [initialWord]);
@@ -231,8 +234,9 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
   };
 
   const handleSave = async () => {
-    if (!word.trim()) return alert('Please enter a word for this gesture');
-    if (Object.keys(selections).length === 0) return alert('Please select at least one symbol');
+    if (!word.trim()) return setNotice('Please enter a word for this gesture.');
+    if (Object.keys(selections).length === 0) return setNotice('Please select at least one symbol.');
+    setNotice('');
     setSaving(true);
     try {
       const sigml = buildSigml();
@@ -249,71 +253,97 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
       if (onClose) onClose();
     } catch (err) {
       console.error('Failed to save', err);
-      alert('Failed to save gesture');
+      setNotice('Failed to save the gesture. Check your connection and try again.');
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-[#0f172a] overflow-y-auto">
-      <div className="p-6 text-white max-w-6xl mx-auto">
+  const selectedCount = STEPS.filter(s => selections[s.id]).length;
 
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-500">
-            Custom Gesture Builder
-          </h2>
+  return (
+    <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto">
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 h-14 bg-surface/80 backdrop-blur-md border-b border-line">
+        <div className="h-full max-w-6xl mx-auto px-3 sm:px-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {onClose && (
+              <button onClick={onClose} className="btn btn-ghost btn-sm -ml-1" aria-label="Back to chat">
+                <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back</span>
+              </button>
+            )}
+            <span className="w-px h-5 bg-line hidden sm:block" />
+            <button
+              onClick={onHome ?? onClose}
+              className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-2 transition-colors"
+              aria-label="Gesture Path — go to dashboard"
+              title="Dashboard"
+            >
+              <img src="/images/Logo.svg" alt="" className="w-6 h-6 rounded-md" />
+              <span className="hidden sm:inline text-[15px] font-bold tracking-tight text-ink">Gesture Path</span>
+            </button>
+            <span className="text-ink-3" aria-hidden="true">/</span>
+            <h2 className="text-[15px] font-semibold tracking-tight text-ink-2 truncate">Sign builder</h2>
+          </div>
           {onClose && (
-            <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
-              <X className="w-6 h-6 text-slate-400" />
+            <button onClick={onClose} className="icon-btn" aria-label="Close builder">
+              <X className="w-5 h-5" />
             </button>
           )}
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 text-ink">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Create a new sign</h1>
+          <p className="text-ink-2 mt-1">Pick a symbol for each part of the sign, then save it so the avatar can perform it.</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* Left – steps + selector */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="lg:col-span-8 space-y-5">
 
             {/* Progress */}
-            <div className="flex justify-between mb-8 relative">
-              <div className="absolute top-4 left-0 w-full h-1 bg-slate-800 -z-10 rounded-full" />
+            <ol className="grid grid-cols-5 gap-2" aria-label="Steps">
               {STEPS.map((s, i) => (
-                <div key={s.id}
-                  className={`flex flex-col items-center gap-2 cursor-pointer ${i <= currentStep ? 'text-green-400' : 'text-slate-600'}`}
-                  onClick={() => setCurrentStep(i)}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                    i === currentStep ? 'bg-green-500 text-white shadow-lg shadow-green-500/20 ring-2 ring-green-400'
-                    : i < currentStep ? 'bg-green-700 text-white'
-                    : 'bg-slate-800 border border-slate-700'
-                  }`}>
-                    {i + 1}
-                  </div>
-                  <span className="text-xs font-medium hidden md:block">{s.title}</span>
-                  {selections[s.id] && (
-                    <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                  )}
-                </div>
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(i)}
+                    aria-current={i === currentStep ? 'step' : undefined}
+                    className="w-full text-left group"
+                  >
+                    <div className={`h-1.5 rounded-full mb-2 transition-colors ${
+                      i === currentStep ? 'bg-brand' : selections[s.id] ? 'bg-sign' : 'bg-line group-hover:bg-line-strong'
+                    }`} />
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[11px] font-bold ${i === currentStep ? 'text-brand' : 'text-ink-3'}`}>{i + 1}</span>
+                      <span className={`text-xs font-semibold truncate hidden sm:block ${i === currentStep ? 'text-ink' : 'text-ink-3'}`}>{s.title}</span>
+                    </div>
+                  </button>
+                </li>
               ))}
-            </div>
+            </ol>
 
             {/* Symbol grid */}
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-3xl p-6 min-h-[380px]">
-              <h3 className="text-xl font-bold mb-4 text-slate-200">Select {step.title}</h3>
+            <div className="card shadow-soft p-4 sm:p-6 min-h-[380px]">
+              <div className="flex items-baseline justify-between gap-3 mb-4">
+                <h3 className="text-lg font-bold text-ink">Select {step.title.toLowerCase()}</h3>
+                <span className="text-xs text-ink-3">Step {currentStep + 1} of {STEPS.length}</span>
+              </div>
 
               {step.id === 'location' ? (
                 /* Location — text buttons */
-                <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                   {symbols.map(sym => (
                     <button
                       key={sym.id}
                       onClick={() => handleSelect(sym)}
-                      className={`py-3 px-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                      className={`py-3 px-2 rounded-xl border text-sm font-medium transition-all ${
                         currentSelection?.id === sym.id
-                          ? 'border-green-400 bg-green-900/40 text-green-300 ring-2 ring-green-400/30 scale-105'
-                          : 'border-slate-700 hover:border-green-500 bg-slate-900/50 text-slate-300'
+                          ? 'border-brand bg-brand-soft text-brand-ink shadow-ring'
+                          : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
                       }`}
                     >
                       {sym.label}
@@ -322,17 +352,17 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
                 </div>
               ) : (
                 /* Image grid */
-                <div className="grid grid-cols-5 md:grid-cols-8 gap-3 overflow-y-auto max-h-[480px] pr-1">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2.5 overflow-y-auto max-h-[480px] p-1 -m-1">
                   {symbols.map(sym => (
                     <button
                       key={sym.id}
                       onClick={() => handleSelect(sym)}
                       onMouseEnter={() => setHoveredId(sym.id)}
                       onMouseLeave={() => setHoveredId(null)}
-                      className={`aspect-square rounded-xl border-2 transition-all flex items-center justify-center overflow-hidden relative ${
+                      className={`aspect-square rounded-xl border transition-all flex items-center justify-center overflow-hidden relative bg-white ${
                         currentSelection?.id === sym.id
-                          ? 'border-green-400 ring-2 ring-green-400/40 scale-105 bg-white'
-                          : 'border-slate-700 hover:border-green-500 bg-white'
+                          ? 'border-brand ring-2 ring-brand/40'
+                          : 'border-line hover:border-line-strong hover:shadow-soft'
                       }`}
                     >
                       <img
@@ -342,7 +372,7 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                       {hoveredId === sym.id && (
-                        <div className="absolute inset-0 bg-green-500/10 rounded-xl pointer-events-none" />
+                        <div className="absolute inset-0 bg-brand/5 pointer-events-none" />
                       )}
                     </button>
                   ))}
@@ -350,40 +380,41 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
               )}
             </div>
 
+            {notice && (
+              <div role="alert" className="px-4 py-3 rounded-xl bg-danger-soft border border-danger/20 text-danger text-sm">
+                {notice}
+              </div>
+            )}
+
             {/* Navigation */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap justify-between items-center gap-3">
               <button
                 onClick={handleBack}
                 disabled={currentStep === 0}
-                className={`px-6 py-3 rounded-xl font-semibold flex items-center gap-2 ${
-                  currentStep === 0 ? 'opacity-0 pointer-events-none' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
+                className={`btn btn-secondary btn-lg ${currentStep === 0 ? 'invisible' : ''}`}
               >
-                <ArrowLeft className="w-5 h-5" /> Back
+                <ArrowLeft className="w-4 h-4" /> Back
               </button>
 
               {currentStep < STEPS.length - 1 ? (
-                <button
-                  onClick={handleNext}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/20"
-                >
-                  Next <ArrowRight className="w-5 h-5" />
+                <button onClick={handleNext} className="btn btn-primary btn-lg">
+                  Next <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
-                <div className="flex gap-3 items-center">
+                <div className="flex flex-wrap gap-2.5 items-center">
                   <input
                     type="text"
                     placeholder="Enter gesture word"
                     value={word}
                     onChange={e => setWord(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:border-green-500 outline-none"
+                    className="input h-12 w-56"
                   />
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="px-6 py-3 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-green-500/20"
+                    className="btn btn-lg bg-sign text-white hover:bg-sign/90 shadow-sm"
                   >
-                    {saving ? 'Saving…' : 'Save Gesture'} <Save className="w-5 h-5" />
+                    {saving ? 'Saving…' : 'Save Gesture'} <Save className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -392,33 +423,37 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
 
           {/* Right – current sequence */}
           <div className="lg:col-span-4">
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-3xl p-6 h-full">
-              <h3 className="text-xl font-bold mb-4 text-slate-200">Current Sequence</h3>
+            <div className="card shadow-soft p-5 lg:sticky lg:top-20">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-ink">Current sequence</h3>
+                <span className="chip">{selectedCount} / {STEPS.length}</span>
+              </div>
               <div className="space-y-2">
-                {STEPS.filter(s => selections[s.id]).length === 0 ? (
-                  <p className="text-slate-500 text-sm italic">No symbols selected yet.</p>
+                {selectedCount === 0 ? (
+                  <p className="text-ink-3 text-sm py-6 text-center">No symbols selected yet.</p>
                 ) : (
                   STEPS.filter(s => selections[s.id]).map((s, idx) => {
                     const sym = selections[s.id]!;
                     return (
-                      <div key={s.id} className="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50 flex items-center gap-3">
-                        <div className="w-6 h-6 bg-slate-800 rounded-full flex items-center justify-center text-xs text-slate-400 flex-shrink-0">
+                      <div key={s.id} className="p-2.5 rounded-xl bg-surface-2 border border-line flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-surface border border-line flex items-center justify-center text-[11px] font-bold text-ink-2 flex-shrink-0">
                           {idx + 1}
                         </div>
                         {sym.img ? (
-                          <img src={sym.img} alt={sym.id} className="w-8 h-8 object-contain bg-white rounded flex-shrink-0" />
+                          <img src={sym.img} alt={sym.id} className="w-9 h-9 object-contain bg-white rounded-lg border border-line flex-shrink-0" />
                         ) : (
-                          <span className="w-8 h-8 flex items-center justify-center text-xs text-green-400 flex-shrink-0">
+                          <span className="w-9 h-9 rounded-lg bg-brand-soft text-brand-ink flex items-center justify-center text-[11px] font-bold flex-shrink-0">
                             {sym.label?.slice(0, 3)}
                           </span>
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="text-slate-400 text-xs">{s.title}</div>
-                          <div className="text-slate-300 text-xs font-mono truncate">{sym.tag || '(none)'}</div>
+                          <div className="text-ink text-xs font-semibold">{s.title}</div>
+                          <div className="text-ink-3 text-[11px] font-mono truncate">{sym.tag || '(none)'}</div>
                         </div>
                         <button
                           onClick={() => removeStep(s.id)}
-                          className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
+                          className="icon-btn w-8 h-8 hover:text-danger hover:bg-danger-soft"
+                          aria-label={`Remove ${s.title}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -429,14 +464,15 @@ const Builder: React.FC<BuilderProps> = ({ initialWord = '', onClose }) => {
               </div>
 
               {/* Word input also visible at top of right panel for convenience */}
-              <div className="mt-6 pt-4 border-t border-slate-700/50">
-                <label className="text-slate-400 text-xs mb-1 block">Gesture word</label>
+              <div className="mt-5 pt-4 border-t border-line">
+                <label className="block text-[13px] font-semibold text-ink-2 mb-1.5" htmlFor="builder-word">Gesture word</label>
                 <input
+                  id="builder-word"
                   type="text"
                   placeholder="e.g. apple"
                   value={word}
                   onChange={e => setWord(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:border-green-500 outline-none"
+                  className="input"
                 />
               </div>
             </div>
