@@ -30,6 +30,11 @@ export class SignClassifier {
 
   static async load(): Promise<SignClassifier> {
     const tf = await import('@tensorflow/tfjs');
+    // The classifier is tiny: run it on the CPU so every device computes the same
+    // float32 result (phone GPUs often use 16-bit floats, which shifts borderline
+    // predictions). MediaPipe still uses the GPU for landmark tracking.
+    await tf.setBackend('cpu');
+    await tf.ready();
     const [model, meta] = await Promise.all([
       tf.loadLayersModel(MODEL_URL),
       fetch(META_URL).then((r) => {

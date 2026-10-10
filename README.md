@@ -35,6 +35,16 @@ node ml/export_tfjs.mjs training/out                                   # -> publ
 ```
 `ml/features.py` and `src/sign/features.ts` must stay identical — `ml/test_parity.py` checks this.
 
+## Testing on a phone (local network)
+Phones only allow the camera on HTTPS pages, so use the phone dev mode:
+```bash
+node server/server.js     # backend on this machine
+npm run dev:phone         # HTTPS dev server on your Wi-Fi; API calls are proxied to the backend
+```
+Open the printed `Network: https://<your-ip>:5173` address on the phone (same Wi-Fi) and accept the
+self-signed certificate warning. Add `?debug=1` to the URL to show the sign-recognition debug panel
+(frames per second, shoulders/hands detected, segmenter state, last top-3 guesses); `?debug=0` hides it.
+
 ## Prerequisites
 - Node.js (v16+)
 - NPM

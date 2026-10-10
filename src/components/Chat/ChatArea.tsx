@@ -268,7 +268,7 @@ const EmptyState: React.FC<{ taskId: string; onExample: (text: string) => void }
             <ol className="text-sm text-ink-2 space-y-3 text-left">
               {[
                 <>Sit back so your <b className="font-semibold text-ink">head, shoulders and hands</b> are in view.</>,
-                <>Raise your hands, make one sign, then <b className="font-semibold text-ink">lower your hands</b>.</>,
+                <>Make one sign, then <b className="font-semibold text-ink">pause for a moment</b> or lower your hands.</>,
                 <>Each recognised word is added to the message. Edit it if needed, then send.</>,
               ].map((step, i) => (
                 <li key={i} className="flex gap-3">

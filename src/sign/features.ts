@@ -94,3 +94,26 @@ export function resample(feats: Float32Array[], length = SEQ_LEN): Float32Array[
   const n = feats.length;
   return Array.from({ length }, (_, t) => feats[Math.min(Math.floor(((t + 0.5) * n) / length), n - 1)]);
 }
+
+// ── Helpers for live segmentation / guidance (not model features) ──────────
+
+/** Wrist + index-tip locations of each present hand (body-normalised), NaN if absent; null if no hand. */
+export function handLocations(feats: Float32Array): number[] | null {
+  const out: number[] = [];
+  let any = false;
+  for (const off of [10, 10 + HAND_DIM]) {
+    const present = feats[off] > 0.5;
+    any = any || present;
+    for (let k = 41; k < 45; k++) out.push(present ? feats[off + k] : NaN);
+  }
+  return any ? out : null;
+}
+
+/**
+ * Normalised image y of the "rest line": hands below it count as lowered (sign
+ * finished). null when the shoulders aren't detected.
+ */
+export function restLineY(pose: Point[] | null, aspect: number): number | null {
+  const ref = bodyFrame(pose, aspect);
+  return ref ? ref.cy + ACTIVE_WRIST_MAX_Y * ref.scale : null;
+}

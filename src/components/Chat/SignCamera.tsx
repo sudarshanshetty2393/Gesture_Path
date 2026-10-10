@@ -3,7 +3,7 @@ import { Camera, CameraOff, Film, Hand, X, AlertTriangle, Maximize2, Minimize2, 
 import { getSignEngine, SignEngine } from '../../sign/engine';
 import { SignSegmenter } from '../../sign/segmenter';
 import { Guess } from '../../sign/classifier';
-import { RawFrame } from '../../sign/features';
+import { RawFrame, restLineY } from '../../sign/features';
 import { HolisticResults, toRawFrame } from '../../sign/holistic';
 
 interface SignCameraProps {
@@ -66,6 +66,19 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
   const [lastResult, setLastResult] = useState<LastResult | null>(null);
   const [fileProgress, setFileProgress] = useState<number | null>(null);
   const [showVocabulary, setShowVocabulary] = useState(false);
+  // Framing feedback: are the shoulders in view (needed to normalise the signs)?
+  const [shouldersVisible, setShouldersVisible] = useState(true);
+  const shouldersMissingSinceRef = useRef<number | null>(null);
+  // Debug panel for testing on other devices: open the app with ?debug=1 (or ?debug=0 to hide).
+  const [debug] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('debug');
+      if (q !== null) localStorage.setItem('gp_debug', q === '1' ? '1' : '0');
+      return localStorage.getItem('gp_debug') === '1';
+    } catch { return false; }
+  });
+  const debugRef = useRef({ frames: 0, since: performance.now(), fps: 0 });
+  const [debugInfo, setDebugInfo] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState(false);
   const [justSent, setJustSent] = useState(false);
 
@@ -79,6 +92,10 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
     const guesses = engine.classifier.classify(frames, aspect);
     if (!guesses || guesses.length === 0) return;
     const accepted = guesses[0].confidence >= AUTO_ACCEPT_CONFIDENCE;
+    setDebugInfo((prev) => ({
+      ...prev,
+      last: `${frames.length}f → ${guesses.map((g) => `${g.word} ${Math.round(g.confidence * 100)}%`).join(', ')}`,
+    }));
     if (accepted) onWordRef.current(displayWord(guesses[0].word));
     setLastResult({ guesses, accepted });
   }, []);
@@ -94,6 +111,19 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
     if (!ctx) return;
     ctx.clearRect(0, 0, w, h);
     canvas.style.transform = mirrored ? 'scaleX(-1)' : '';
+    // "Rest line": hands below it count as lowered (the sign is finished).
+    const restY = restLineY(results.poseLandmarks ?? null, w / h);
+    if (restY !== null && restY > 0.05 && restY < 0.98) {
+      ctx.save();
+      ctx.setLineDash([10, 8]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(0, restY * h);
+      ctx.lineTo(w, restY * h);
+      ctx.stroke();
+      ctx.restore();
+    }
     const hands: Array<[HolisticResults['leftHandLandmarks'], string]> = [
       [results.leftHandLandmarks, '#34d399'],
       [results.rightHandLandmarks, '#60a5fa'],
@@ -127,9 +157,43 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
 
     const frame = toRawFrame(results);
     setHandsVisible(!!(frame.lh || frame.rh));
+
+    // Shoulders must be in view; warn after a second without them.
+    const pose = results.poseLandmarks;
+    const shouldersOk = !!pose && [11, 12].every((i) => {
+      const p = pose[i] as { x: number; y: number; visibility?: number };
+      return p.y > 0 && p.y < 1 && p.x > 0 && p.x < 1 && (p.visibility ?? 1) > 0.5;
+    });
+    if (shouldersOk) {
+      shouldersMissingSinceRef.current = null;
+      setShouldersVisible(true);
+    } else {
+      shouldersMissingSinceRef.current ??= ts;
+      if (ts - shouldersMissingSinceRef.current > 1000) setShouldersVisible(false);
+    }
     const segmenter = segmenterRef.current;
     const finished = segmenter.push(frame, aspect, ts);
     setSigning(segmenter.state === 'signing');
+
+    if (debug) {
+      const d = debugRef.current;
+      d.frames++;
+      const now = performance.now();
+      if (now - d.since >= 1000) {
+        d.fps = (d.frames * 1000) / (now - d.since);
+        d.frames = 0;
+        d.since = now;
+        setDebugInfo((prev) => ({
+          ...prev,
+          fps: d.fps.toFixed(1),
+          camera: `${video.videoWidth}×${video.videoHeight}`,
+          shoulders: shouldersOk ? 'yes' : 'NO',
+          hands: `${frame.lh ? 'L' : '-'}${frame.rh ? 'R' : '-'}`,
+          state: segmenter.state,
+          speed: segmenter.speed.toFixed(2),
+        }));
+      }
+    }
 
     if (finished) {
       setLiveGuess(null);
@@ -142,7 +206,7 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
     } else if (segmenter.state !== 'signing') {
       setLiveGuess(null);
     }
-  }, [drawOverlay, handleSegment]);
+  }, [drawOverlay, handleSegment, debug]);
 
   const stopCamera = useCallback(() => {
     cameraTicketRef.current++;
@@ -373,9 +437,11 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
       ? liveGuess
         ? `Signing… looks like "${displayWord(liveGuess.word)}"`
         : 'Signing…'
-      : handsVisible
-        ? 'Raise your hand to sign, lower it when the sign is done'
-        : 'Show your head, shoulders and hands to the camera';
+      : !shouldersVisible
+        ? 'Move back a little so your shoulders are in view'
+        : handsVisible
+          ? 'Sign one word, then pause or lower your hands'
+          : 'Show your head, shoulders and hands to the camera';
 
   const isPanel = layout === 'panel' && !expanded;
   const toolbarBtn = 'icon-btn w-8 h-8';
@@ -474,6 +540,16 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
           style={{ transform: fileProgress === null ? 'scaleX(-1)' : '' }}
         />
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+
+        {debug && (
+          <div className="absolute top-2 left-2 z-10 max-w-[90%] px-2.5 py-2 rounded-lg bg-black/75 text-[11px] leading-snug font-mono text-white pointer-events-none">
+            <div className="font-bold text-emerald-300 mb-0.5">debug</div>
+            {Object.entries(debugInfo).map(([k, v]) => (
+              <div key={k} className="truncate"><span className="text-white/50">{k}:</span> {v}</div>
+            ))}
+            {Object.keys(debugInfo).length === 0 && <div className="text-white/60">waiting for frames…</div>}
+          </div>
+        )}
 
         {status === 'loading' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70 text-sm">
@@ -582,7 +658,9 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
             )}
           </div>
         ) : !expanded && status === 'ready' && (
-          <p className="text-[13px] text-ink-3">Recognised words are added to your message automatically.</p>
+          <p className="text-[13px] text-ink-3">
+            Sign one word at a time. To finish a word, pause for a moment or lower your hands below the dashed line.
+          </p>
         )}
 
         {showVocabulary && engineRef.current && (
