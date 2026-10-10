@@ -186,6 +186,7 @@ export const SignCamera: React.FC<SignCameraProps> = ({ onWord, onReplaceLastWor
         setDebugInfo((prev) => ({
           ...prev,
           fps: d.fps.toFixed(1),
+          engine: engine.delegate,
           camera: `${video.videoWidth}×${video.videoHeight}`,
           shoulders: shouldersOk ? 'yes' : 'NO',
           hands: `${frame.lh ? 'L' : '-'}${frame.rh ? 'R' : '-'}`,

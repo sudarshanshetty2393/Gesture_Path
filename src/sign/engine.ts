@@ -12,6 +12,8 @@ import type { SignClassifier } from './classifier';
 
 export interface SignEngine {
   classifier: SignClassifier;
+  /** Where MediaPipe runs on this device (GPU if it passed the self-test). */
+  readonly delegate: 'GPU' | 'CPU';
   /** Routes Holistic results to the current consumer (camera or video file). */
   setResultsHandler(handler: ((r: HolisticResults) => void) | null): void;
   /** Runs Holistic on the video's current frame; results go to the handler. */
